@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Advection Scheme</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
+      rel="stylesheet"
+    />
+  </head>
+  <body
+    class="bg-gray-900 text-white min-h-screen flex flex-col items-center justify-center"
+  >
+    <h1 class="text-3xl font-bold mb-8 text-yellow-400">
+      Choose a Simulation Method
+    </h1>
+
+    <div class="flex space-x-4">
+      <!-- Button for Central Difference Method -->
+      <button
+        onclick="openPage('centralDifferenceScheme.html')"
+        class="px-4 py-2 bg-blue-500 rounded text-gray-900 font-semibold hover:bg-blue-600"
+      >
+        Central Difference
+      </button>
+
+      <!-- Button for First Order Upwind Scheme -->
+      <button
+        onclick="openPage('firstOrderUpwind.html')"
+        class="px-4 py-2 bg-green-500 rounded text-gray-900 font-semibold hover:bg-green-600"
+      >
+        First Order Upwind
+      </button>
+
+      <!-- Button for Second Order Upwind Scheme -->
+      <button
+        onclick="openPage('secondOrderUpwind.html')"
+        class="px-4 py-2 bg-red-500 rounded text-gray-900 font-semibold hover:bg-red-600"
+      >
+        Second Order Upwind
+      </button>
+      <button
+        onclick="openPage('quick.html')"
+        class="px-4 py-2 bg-pink-500 rounded text-gray-900 font-semibold hover:bg-red-600"
+      >
+        Quatratic Upwind Scheme
+      </button>
+    </div>
+
+    <script>
+      function openPage(page) {
+        window.location.href = page; // Opens the page in the same tab
+        // To open in a new tab, use: window.open(page, '_blank');
+      }
+    </script>
+  </body>
+</html>

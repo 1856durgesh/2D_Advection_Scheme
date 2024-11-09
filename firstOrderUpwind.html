@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>First-Order Upwind Scheme</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-3xl bg-gray-800 rounded-lg shadow-lg p-6 space-y-6">
+        <h1 class="text-2xl font-bold text-center text-yellow-300">2D Advection By First-Order Upwind Scheme </h1>
+
+        <!-- Input form for simulation parameters -->
+        <form id="inputForm" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label for="nx" class="block text-sm font-medium text-yellow-200">Grid Points in x (nx):</label>
+                <input type="number" id="nx" value="50" class="mt-1 w-full p-2 bg-gray-700 border border-gray-600 rounded focus:ring-2 focus:ring-yellow-300">
+            </div>
+            <div>
+                <label for="ny" class="block text-sm font-medium text-yellow-200">Grid Points in y (ny):</label>
+                <input type="number" id="ny" value="50" class="mt-1 w-full p-2 bg-gray-700 border border-gray-600 rounded focus:ring-2 focus:ring-yellow-300">
+            </div>
+            <div>
+                <label for="dx" class="block text-sm font-medium text-yellow-200">Grid Spacing in x (dx):</label>
+                <input type="number" id="dx" step="0.1" value="1.0" class="mt-1 w-full p-2 bg-gray-700 border border-gray-600 rounded focus:ring-2 focus:ring-yellow-300">
+            </div>
+            <div>
+                <label for="dy" class="block text-sm font-medium text-yellow-200">Grid Spacing in y (dy):</label>
+                <input type="number" id="dy" step="0.1" value="1.0" class="mt-1 w-full p-2 bg-gray-700 border border-gray-600 rounded focus:ring-2 focus:ring-yellow-300">
+            </div>
+            <div>
+                <label for="u" class="block text-sm font-medium text-yellow-200">Speed in x-direction (u):</label>
+                <input type="number" id="u" value="1.0" class="mt-1 w-full p-2 bg-gray-700 border border-gray-600 rounded focus:ring-2 focus:ring-yellow-300">
+            </div>
+            <div>
+                <label for="v" class="block text-sm font-medium text-yellow-200">Speed in y-direction (v):</label>
+                <input type="number" id="v" value="1.0" class="mt-1 w-full p-2 bg-gray-700 border border-gray-600 rounded focus:ring-2 focus:ring-yellow-300">
+            </div>
+            <div>
+                <label for="nStep" class="block text-sm font-medium text-yellow-200">Number of Steps:</label>
+                <input type="number" id="nStep" value="1000" class="mt-1 w-full p-2 bg-gray-700 border border-gray-600 rounded focus:ring-2 focus:ring-yellow-300">
+            </div>
+            <div>
+                <label for="T_LHS" class="block text-sm font-medium text-yellow-200"> Boundary 1 Temperature :</label>
+                <input type="number" id="T_LHS" value="100.0" class="mt-1 w-full p-2 bg-gray-700 border border-gray-600 rounded focus:ring-2 focus:ring-yellow-300">
+            </div>
+            <div>
+                <label for="T_Down" class="block text-sm font-medium text-yellow-200"> Boundary 2 Temperature :</label>
+                <input type="number" id="T_Down" value="50.0" class="mt-1 w-full p-2 bg-gray-700 border border-gray-600 rounded focus:ring-2 focus:ring-yellow-300">
+            </div>
+        </form>
+
+        <div class="text-center">
+            <button type="button" onclick="runSimulation()" class="mt-4 px-6 py-2 bg-yellow-500 hover:bg-yellow-400 text-gray-900 font-semibold rounded-lg">Run Simulation</button>
+        </div>
+
+        <h2 class="text-xl font-semibold text-center text-yellow-300 mt-6">Temperature Distribution Plot</h2>
+        <div id="plot"></div>
+    </div>
+
+    <script>
+          // Function to apply boundary conditions
+      function applyBoundaryCondition(T, nx, ny, T_LHS, T_Down) {
+        for (let j = 0; j < ny; j++) {
+          T[0][j] = T_LHS;
+        }
+        for (let i = 0; i < nx; i++) {
+          T[i][0] = T_Down;
+        }
+      }
+
+      // First-Order Upwind Scheme for x-direction advection
+      function firstOrderUpwindX(i, j, T, dx, u) {
+        return u > 0
+          ? (T[i][j] - T[i - 1][j]) / dx
+          : (T[i + 1][j] - T[i][j]) / dx;
+      }
+
+      // First-Order Upwind Scheme for y-direction advection
+      function firstOrderUpwindY(i, j, T, dy, v) {
+        return v > 0
+          ? (T[i][j] - T[i][j - 1]) / dy
+          : (T[i][j + 1] - T[i][j]) / dy;
+      }
+
+      // Function for explicit time marching
+      function explicitTimeMarching(T, nx, ny, dx, dy, dt, u, v) {
+        let T_new = T.map((arr) => [...arr]); // Deep copy of T
+
+        for (let i = 1; i <= nx - 1; i++) {
+          for (let j = 1; j <= ny - 1; j++) {
+            let adv_x = -u * firstOrderUpwindX(i, j, T, dx, u);
+            let adv_y = -v * firstOrderUpwindY(i, j, T, dy, v);
+            T_new[i][j] = T[i][j] + dt * (adv_x + adv_y);
+          }
+        }
+
+        return T_new;
+      }
+
+      // Main simulation function
+      function runSimulation() {
+        const nx = parseInt(document.getElementById("nx").value);
+        const ny = parseInt(document.getElementById("ny").value);
+        const dx = parseFloat(document.getElementById("dx").value);
+        const dy = parseFloat(document.getElementById("dy").value);
+        const u = parseFloat(document.getElementById("u").value);
+        const v = parseFloat(document.getElementById("v").value);
+        const nStep = parseInt(document.getElementById("nStep").value);
+        const T_LHS = parseFloat(document.getElementById("T_LHS").value);
+        const T_Down = parseFloat(document.getElementById("T_Down").value);
+        const dt_cfl = 1.0 / ((u / dx) + (v / dy));
+        const dt = 0.5 * dt_cfl;
+
+        // Initialize temperature field
+        let T = Array.from({ length: nx }, () => Array(ny).fill(0));
+        applyBoundaryCondition(T, nx, ny, T_LHS, T_Down);
+
+        // Time-stepping loop
+        for (let step = 0; step < nStep; step++) {
+          T = explicitTimeMarching(T, nx, ny, dx, dy, dt, u, v);
+          applyBoundaryCondition(T, nx, ny, T_LHS, T_Down);
+        }
+
+        // Plotting the results
+        plotTemperature(T, nx, ny);
+      }
+
+      // Plot temperature distribution
+      function plotTemperature(T, nx, ny) {
+        let x = Array.from({ length: nx }, (_, i) => i);
+        let y = Array.from({ length: ny }, (_, i) => i);
+
+        let data = [
+          {
+            z: T,
+            x: x,
+            y: y,
+            type: "heatmap",
+            colorscale: "Viridis",
+          },
+        ];
+
+        Plotly.newPlot("plot", data, {
+          title: "Temperature Distribution",
+          xaxis: { title: "X Location" },
+          yaxis: { title: "Y Location" },
+          autosize: true,
+        });
+      }
+    </script>
+</body>
+</html>

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quadratic Upwind Scheme</title>
+  <link
+    href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
+    rel="stylesheet"
+  />
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex flex-col items-center justify-center">
+
+  <h1 class="text-3xl font-bold mb-8 text-yellow-400">2D Advection By Quick Scheme</h1>
+
+  <div class="grid grid-cols-2 gap-4 bg-gray-800 p-8 rounded-lg shadow-lg">
+    <div class="flex flex-col">
+      <label for="nx" class="text-sm font-medium text-yellow-200">Grid Points in x (nx):</label>
+      <input type="number" id="nx" class="p-2 rounded bg-gray-700 text-white" value="20" />
+    </div>
+    <div class="flex flex-col">
+      <label for="ny" class="text-sm font-medium text-yellow-200">Grid Points in y (ny):</label>
+      <input type="number" id="ny" class="p-2 rounded bg-gray-700 text-white" value="20" />
+    </div>
+    <div class="flex flex-col">
+      <label for="dx" class="text-sm font-medium text-yellow-200">Grid Spacing in x (dx):</label>
+      <input type="number" id="dx" class="p-2 rounded bg-gray-700 text-white" value="1.0" />
+    </div>
+    <div class="flex flex-col">
+      <label for="dy" class="text-sm font-medium text-yellow-200">Grid Spacing in y (dy):</label>
+      <input type="number" id="dy" class="p-2 rounded bg-gray-700 text-white" value="1.0" />
+    </div>
+    <div class="flex flex-col">
+      <label for="u_speed" class="text-sm font-medium text-yellow-200">Speed in x-direction (u):</label>
+      <input type="number" id="u_speed" class="p-2 rounded bg-gray-700 text-white" value="10.0" />
+    </div>
+    <div class="flex flex-col">
+      <label for="v_speed" class="text-sm font-medium text-yellow-200">Speed in y-direction (v):</label>
+      <input type="number" id="v_speed" class="p-2 rounded bg-gray-700 text-white" value="10.0" />
+    </div>
+    <div class="flex flex-col">
+      <label for="nsteps" class="text-sm font-medium text-yellow-200">Number of Steps:</label>
+      <input type="number" id="nsteps" class="p-2 rounded bg-gray-700 text-white" value="1000" />
+    </div>
+    <div class="flex flex-col">
+      <label for="T_LHS" class="text-sm font-medium text-yellow-200"> Boundary 1 Temperature :</label>
+      <input type="number" id="T_LHS" class="p-2 rounded bg-gray-700 text-white" value="100.0" />
+    </div>
+    <div class="flex flex-col">
+      <label for="T_Down" class="text-sm font-medium text-yellow-200"> Boundary 2 Temperature :</label>
+      <input type="number" id="T_Down" class="p-2 rounded bg-gray-700 text-white" value="50.0" />
+    </div>
+  </div>
+
+  <button onclick="runSimulation()" class="mt-6 px-4 py-2 bg-yellow-500 rounded text-gray-900 font-semibold hover:bg-yellow-600">
+    Run Simulation
+  </button>
+
+  <h2 class="text-xl font-semibold text-center text-yellow-300 mt-6">Temperature Distribution Plot</h2>
+  <div id="plot"></div>
+
+  <script>
+    function getInputValues() {
+      return {
+        nx: parseInt(document.getElementById("nx").value),
+        ny: parseInt(document.getElementById("ny").value),
+        dx: parseFloat(document.getElementById("dx").value),
+        dy: parseFloat(document.getElementById("dy").value),
+        u: parseFloat(document.getElementById("u_speed").value),
+        v: parseFloat(document.getElementById("v_speed").value),
+        nSteps: parseInt(document.getElementById("nsteps").value),
+        T_LHS: parseFloat(document.getElementById("T_LHS").value),
+        T_Down: parseFloat(document.getElementById("T_Down").value)
+      };
+    }
+
+    function applyBoundaryConditions(T, values) {
+      const { nx, ny, T_LHS, T_Down } = values;
+
+      // Left boundary
+      for (let j = 0; j < ny; j++) {
+        T[0][j] = T_LHS;
+      }
+
+      // Bottom boundary
+      for (let i = 0; i < nx; i++) {
+        T[i][0] = T_Down;
+      }
+
+      // Right boundary (RHS) with backward difference approximation
+      for (let j = 0; j < ny; j++) {
+        T[nx - 1][j] = T[nx - 2][j] + (T[nx - 2][j] - T[nx - 3][j]); // Conservative backward difference at RHS
+      }
+
+      // Top boundary with backward difference approximation
+      for (let i = 0; i < nx; i++) {
+        T[i][ny - 1] = T[i][ny - 2] + (T[i][ny - 2] - T[i][ny - 3]); // Conservative backward difference at top
+      }
+    }
+
+    function explicitAdvection(T, values) {
+      const { nx, ny, dx, dy, u, v, T_LHS, T_Down, dt } = values;
+      const T_new = T.map(row => row.slice());
+
+      for (let i = 1; i < nx - 1; i++) {
+        for (let j = 1; j < ny - 1; j++) {
+          let dTdx = 0.0, dTdy = 0.0;
+
+          if (i >= 3 && i <= nx - 2) {
+            dTdx = (7 * T[i - 1][j] - T[i - 2][j] - 3 * T[i][j] - 3 * T[i + 1][j]) / (8 * dx);
+          } else if (i === 2) {
+            dTdx = (5 * T[1][j] - 3 * T[2][j] - 2 * T_LHS) / (2 * dx);
+          } else if (i === 1) {
+            dTdx = 2 * (T_LHS - T[1][j]) / dx;
+          }
+
+          if (j >= 3 && j <= ny - 2) {
+            dTdy = (7 * T[i][j - 1] - T[i][j - 2] - 3 * T[i][j] - 3 * T[i][j + 1]) / (8 * dy);
+          } else if (j === 2) {
+            dTdy = (5 * T[i][1] - 3 * T[i][2] - 2 * T_Down) / (2 * dy);
+          } else if (j === 1) {
+            dTdy = 2 * (T_Down - T[i][1]) / dy;
+          }
+
+          T_new[i][j] = T[i][j] + dt * (u * dTdx + v * dTdy);
+          T_new[i][j] = Math.max(0.0, T_new[i][j]);
+        }
+      }
+      return T_new;
+    }
+
+    function runSimulation() {
+      const values = getInputValues();
+      const dt_cfl = 1.0 / (values.u / values.dx + values.v / values.dy);
+      values.dt = 0.1 * dt_cfl;
+
+      let T = Array.from({ length: values.nx }, () => Array(values.ny).fill(0.0));
+      applyBoundaryConditions(T, values);
+
+      for (let step = 0; step < values.nSteps; step++) {
+        T = explicitAdvection(T, values);
+        applyBoundaryConditions(T, values);
+      }
+      plotTemperature(T, values);
+    }
+
+    function plotTemperature(T, values) {
+      const x = Array.from({ length: values.nx }, (_, i) => i * values.dx);
+      const y = Array.from({ length: values.ny }, (_, j) => j * values.dy);
+
+      Plotly.newPlot("plot", [
+        {
+          z: T,
+          x: x,
+          y: y,
+          type: "heatmap",
+          colorscale: "Viridis",
+          colorbar: { title: "Temperature" },
+        },
+      ], {
+        title: "Temperature Distribution",
+        xaxis: { title: "X Position" },
+        yaxis: { title: "Y Position" },
+      });
+    }
+  </script>
+</body>
+</html>

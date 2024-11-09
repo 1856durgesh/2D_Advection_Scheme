@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Second Order Upwind Scheme</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <!-- Include Plotly CDN for plotting -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex flex-col items-center justify-center">
+    <h1 class="text-3xl font-bold mb-8 text-yellow-400">2D Advection By Second Order Upwind Scheme</h1>
+
+    <div class="grid grid-cols-2 gap-4 bg-gray-800 p-8 rounded-lg shadow-lg">
+        <div class="flex flex-col">
+            <label for="u" class="block text-sm font-medium text-yellow-200">Grid Points in x (nx):</label>
+            <input type="number" id="u" class="p-2 rounded bg-gray-700 text-white" value="50">
+        </div>
+        <div class="flex flex-col">
+            <label for="v" class="block text-sm font-medium text-yellow-200">Grid Points in y (ny):</label>
+            <input type="number" id="v" class="p-2 rounded bg-gray-700 text-white" value="50">
+        </div>
+
+        <div class="flex flex-col">
+            <label for="dx" class="block text-sm font-medium text-yellow-200">Grid Spacing in x (dx):</label>
+            <input type="number" id="dx" class="p-2 rounded bg-gray-700 text-white" value="1.0">
+        </div>
+        <div class="flex flex-col">
+            <label for="dy" class="block text-sm font-medium text-yellow-200">Grid Spacing in y (dy):</label>
+            <input type="number" id="dy" class="p-2 rounded bg-gray-700 text-white" value="1.0">
+        </div>
+
+        <div class="flex flex-col">
+            <label for="u_speed" class="block text-sm font-medium text-yellow-200">Speed in x-direction (u):</label>
+            <input type="number" id="u_speed" class="p-2 rounded bg-gray-700 text-white" value="10.0">
+        </div>
+        <div class="flex flex-col">
+            <label for="v_speed" class="block text-sm font-medium text-yellow-200">Speed in y-direction (v):</label>
+            <input type="number" id="v_speed" class="p-2 rounded bg-gray-700 text-white" value="10.0">
+        </div>
+        <div class="flex flex-col">
+            <label for="nsteps" class="block text-sm font-medium text-yellow-200">Number of Steps:</label>
+            <input type="number" id="nsteps" class="p-2 rounded bg-gray-700 text-white" value="1000">
+        </div>
+
+        <div class="flex flex-col">
+            <label for="T_LHS" class="block text-sm font-medium text-yellow-200"> Boundary 1 Temperature :</label>
+            <input type="number" id="T_LHS" class="p-2 rounded bg-gray-700 text-white" value="100.0">
+        </div>
+        <div class="flex flex-col">
+            <label for="T_Down" class="block text-sm font-medium text-yellow-200"> Boundary 2 Temperature :</label>
+            <input type="number" id="T_Down" class="p-2 rounded bg-gray-700 text-white" value="50.0">
+        </div>
+    </div>
+
+    <button onclick="runSimulation()" class="mt-6 px-4 py-2 bg-yellow-500 rounded text-gray-900 font-semibold hover:bg-yellow-600">Run Simulation</button>
+
+    <h2 class="text-xl font-semibold text-center text-yellow-300 mt-6">Temperature Distribution Plot</h2>
+    <div id="plot"></div>
+
+    <script>
+        function runSimulation() {
+            const nx = parseInt(document.getElementById("u").value);
+            const ny = parseInt(document.getElementById("v").value);
+            const dx = parseFloat(document.getElementById("dx").value);
+            const dy = parseFloat(document.getElementById("dy").value);
+            const u = parseFloat(document.getElementById("u_speed").value);
+            const v = parseFloat(document.getElementById("v_speed").value);
+            const nsteps = parseInt(document.getElementById("nsteps").value);
+            const T_LHS = parseFloat(document.getElementById("T_LHS").value);
+            const T_Down = parseFloat(document.getElementById("T_Down").value);
+
+            const dt_cfl = 1.0 / ((u / dx) + (v / dy));
+            const dt = 0.5 * dt_cfl;
+
+            let T = Array.from({ length: nx }, () => Array(ny).fill(0));
+
+            function explicitAdvection(T) {
+                let T_new = T.map(row => row.slice());
+
+                for (let i = 0; i < nx; ++i) {
+                    for (let j = 0; j < ny; ++j) {
+                        let dTdx = 0.0, dTdy = 0.0;
+
+                        if (i >= 2) {
+                            dTdx = (3.0 * T[i][j] - 4.0 * T[i - 1][j] + T[i - 2][j]) / (2.0 * dx);
+                        } else if (i >= 1) {
+                            dTdx = 2 * (T[i][j] - T[i - 1][j]) / dx;
+                        }
+
+                        if (j >= 2) {
+                            dTdy = (3.0 * T[i][j] - 4.0 * T[i][j - 1] + T[i][j - 2]) / (2.0 * dy);
+                        } else if (j >= 1) {
+                            dTdy = 2 * (T[i][j] - T[i][j - 1]) / dy;
+                        }
+
+                        T_new[i][j] = T[i][j] - dt * (u * dTdx + v * dTdy);
+                    }
+                }
+
+                return T_new;
+            }
+
+            function applyBoundaryConditions(T) {
+                for (let j = 0; j < ny; ++j) {
+                    T[0][j] = T_LHS;
+                }
+                for (let i = 0; i < nx; ++i) {
+                    T[i][0] = T_Down;
+                }
+            }
+
+            applyBoundaryConditions(T);
+
+            for (let step = 0; step < nsteps; ++step) {
+                T = explicitAdvection(T);
+                applyBoundaryConditions(T);
+            }
+
+            plotTemperature(T, nx, ny);
+        }
+
+        function plotTemperature(T, nx, ny) {
+            let x = Array.from({ length: nx }, (_, i) => i);
+            let y = Array.from({ length: ny }, (_, i) => i);
+
+            let data = [
+                {
+                    z: T,
+                    x: x,
+                    y: y,
+                    type: "heatmap",
+                    colorscale: "Viridis",
+                },
+            ];
+
+            Plotly.newPlot("plot", data, {
+                title: "Temperature Distribution",
+                xaxis: { title: "X Location" },
+                yaxis: { title: "Y Location" },
+                autosize: true,
+            });
+        }
+    </script>
+</body>
+</html>
